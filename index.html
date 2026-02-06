@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Automation Master Class (Mobile Ready)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+  :root {
+    --bg-color: #f0f2f5;
+    --grid-color: #e2e8f0;
+    --primary: #6d28d9;
+    --success: #22c55e;
+    --error: #ef4444;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--bg-color);
+    background-image: radial-gradient(var(--grid-color) 1px, transparent 1px);
+    background-size: 20px 20px;
+    text-align: center;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none; /* Safari fix */
+    touch-action: none; /* Prevents screen scrolling while dragging */
+    overflow: hidden; /* Lock scroll on mobile to focus on game */
+  }
+
+  /* Allow scrolling only if content overflows vertically on small screens */
+  @media (max-height: 700px) {
+    body { overflow-y: auto; touch-action: pan-y; }
+  }
+
+  h1 { color: #1e293b; margin-bottom: 5px; font-weight: 800; font-size: 24px; }
+  h2 { color: var(--primary); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+  p { color: #64748b; margin-top: 0; font-size: 16px; max-width: 600px; line-height: 1.4; padding: 0 10px; }
+
+  /* GAME BOARD */
+  .game-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid #fff;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1);
+    border-radius: 20px;
+    padding: 20px 10px;
+    margin-top: 15px;
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 650px;
+    box-sizing: border-box;
+  }
+
+  .canvas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px; /* Tighter gap for mobile */
+    min-height: 100px;
+  }
+
+  /* SLOTS - Responsive Sizing */
+  .slot {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px dashed #cbd5e1;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+  }
+
+  .slot.drag-over {
+    border-color: var(--primary);
+    transform: scale(1.1);
+    background: #ede9fe;
+  }
+
+  .slot.filled {
+    border-style: solid;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  /* CONNECTORS */
+  .connector {
+    width: 30px; /* Shorter for mobile */
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .connector::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 0%;
+    height: 100%;
+    background: var(--success);
+    transition: width 0.6s linear;
+  }
+
+  .connector.active::after { width: 100%; }
+
+  /* MODULES */
+  .module {
+    width: 70px; /* Smaller for mobile */
+    height: 70px;
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    font-size: 10px;
+    font-weight: 600;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+    z-index: 100;
+    text-align: center;
+    line-height: 1.1;
+    touch-action: none; /* Critical for drag on mobile */
+  }
+  
+  .module:active { cursor: grabbing; transform: scale(0.95); }
+  .module i { font-size: 20px; margin-bottom: 4px; pointer-events: none; }
+
+  /* BRAND COLORS */
+  .salesforce { background: linear-gradient(135deg, #00a1e0, #0077a6); }
+  .openai { background: linear-gradient(135deg, #10a37f, #0d8265); }
+  .airtable { background: linear-gradient(135deg, #fcb400, #f59e0b); }
+  .instagram { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
+  .facebook { background: #1877F2; }
+  .clock { background: #475569; }
+  .weather { background: #38bdf8; }
+  .slack { background: #4A154B; }
+  .forms { background: #7248B9; }
+  .trello { background: #0079BF; }
+  .gmail { background: #EA4335; }
+  .shopify { background: #96bf48; }
+  .filter { background: #1e293b; border: 2px solid #94a3b8; }
+  .sheets { background: #1da462; }
+
+  /* MODULE POOL */
+  .modules-pool {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding: 15px;
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    min-height: 90px;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    width: 100%;
+    max-width: 650px;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+  }
+
+  /* CONTROLS */
+  .controls { 
+    margin-top: 20px; 
+    margin-bottom: 40px; 
+    display: flex; 
+    gap: 10px; 
+    justify-content: center; 
+    z-index: 10; 
+    flex-wrap: wrap;
+  }
+
+  button {
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    touch-action: manipulation; /* Improves tap response */
+  }
+
+  .run { background: #1e293b; color: white; box-shadow: 0 4px 0 #0f172a; }
+  .run:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #0f172a; }
+  .run:active { transform: translateY(2px); box-shadow: 0 0 0 #0f172a; }
+  .run.success { background: var(--success); box-shadow: 0 4px 0 #15803d; pointer-events: none; }
+
+  .reset { background: white; color: var(--error); border: 2px solid var(--error); }
+  .reset:hover { background: #fef2f2; }
+
+  .next-level {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 0 #4c1d95;
+    display: none;
+  }
+
+  .status-bar { margin-top: 15px; height: 20px; font-weight: 600; color: #64748b; font-size: 14px; }
+
+  /* ANIMATIONS */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+  .shake { animation: shake 0.4s ease-in-out; border-color: var(--error) !important; }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+  }
+  .processing { animation: pulse 1s infinite; }
+
+  #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+  .hidden { display: none !important; }
+
+  /* Media Query for larger screens */
+  @media (min-width: 600px) {
+    .slot { width: 100px; height: 100px; }
+    .module { width: 90px; height: 90px; font-size: 11px; }
+    .connector { width: 50px; }
+    .modules-pool { gap: 15px; }
+  }
+</style>
+
+<script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
+
+</head>
+
+<body>
+
+<canvas id="confetti-canvas"></canvas>
+
+<h1>🧩 Automation Architect</h1>
+<h2 id="level-indicator">Level 1 of 5</h2>
+<p id="level-goal">Goal loading...</p>
+
+<div class="game-container" id="game-board">
+  <div class="canvas" id="canvas-area">
+    </div>
+</div>
+
+<div class="status-bar" id="status-text">Drag modules to build the flow...</div>
+
+<div class="modules-pool" id="pool-area">
+  </div>
+
+<div class="controls">
+  <button class="reset" onclick="resetLevel()">
+    <i class="fa-solid fa-rotate-left"></i> Reset
+  </button>
+  <button class="run" id="run-btn" onclick="runScenario()">
+    <i class="fa-solid fa-play"></i> Run Scenario
+  </button>
+  <button class="next-level" id="next-btn" onclick="nextLevel()">
+    Next Level <i class="fa-solid fa-arrow-right"></i>
+  </button>
+</div>
+
+<script>
+  // --- LEVEL DATA ---
+  const levels = [
+    {
+      id: 1,
+      goal: "<b>Social Sync:</b> When I post a photo on <u>Instagram</u>, automatically share it to my <u>Facebook Page</u>.",
+      solution: ["instagram", "facebook"],
+      modules: [
+        { type: "instagram", label: "Instagram", icon: "fa-brands fa-instagram" },
+        { type: "facebook", label: "Facebook", icon: "fa-brands fa-facebook" },
+        { type: "sheets", label: "Google Sheets", icon: "fa-solid fa-file-csv" }
+      ]
+    },
+    {
+      id: 2,
+      goal: "<b>Lead Responder:</b> When a <u>Salesforce</u> lead arrives, use <u>AI</u> to write an email, then save to <u>Airtable</u>.",
+      solution: ["salesforce", "openai", "airtable"],
+      modules: [
+        { type: "salesforce", label: "Salesforce", icon: "fa-brands fa-salesforce" },
+        { type: "openai", label: "ChatGPT", icon: "fa-solid fa-wand-magic-sparkles" },
+        { type: "airtable", label: "Airtable", icon: "fa-solid fa-table-list" }
+      ]
+    },
+    {
+      id: 3,
+      goal: "<b>Morning Brief:</b> Every <u>Morning at 8AM</u>, get the <u>Weather</u> forecast and send it to <u>Slack</u>.",
+      solution: ["clock", "weather", "slack"],
+      modules: [
+        { type: "weather", label: "Weather", icon: "fa-solid fa-cloud-sun" },
+        { type: "clock", label: "Every Morning", icon: "fa-regular fa-clock" },
+        { type: "slack", label: "Slack", icon: "fa-brands fa-slack" }
+      ]
+    },
+    {
+      id: 4,
+      goal: "<b>Form Process:</b> When a <u>Google Form</u> is submitted, create a <u>Trello</u> card, then email them via <u>Gmail</u>.",
+      solution: ["forms", "trello", "gmail"],
+      modules: [
+        { type: "forms", label: "Google Forms", icon: "fa-brands fa-google-drive" },
+        { type: "gmail", label: "Gmail", icon: "fa-regular fa-envelope" },
+        { type: "trello", label: "Trello", icon: "fa-brands fa-trello" }
+      ]
+    },
+    {
+      id: 5,
+      goal: "<b>VIP Filter:</b> When a <u>Shopify</u> order comes in, check if it is over $100 (<u>Filter</u>), then add to <u>Sheets</u>.",
+      solution: ["shopify", "filter", "sheets"],
+      modules: [
+        { type: "shopify", label: "Shopify", icon: "fa-brands fa-shopify" },
+        { type: "sheets", label: "Google Sheets", icon: "fa-solid fa-file-csv" },
+        { type: "filter", label: "Filter > $100", icon: "fa-solid fa-filter" },
+        { type: "gmail", label: "Gmail", icon: "fa-regular fa-envelope" }
+      ]
+    }
+  ];
+
+  // --- STATE ---
+  let currentLevelIndex = 0;
+  let dragged = null;
+  let isRunning = false;
+  
+  // --- ELEMENTS ---
+  const levelIndicator = document.getElementById("level-indicator");
+  const levelGoal = document.getElementById("level-goal");
+  const canvasArea = document.getElementById("canvas-area");
+  const poolArea = document.getElementById("pool-area");
+  const statusText = document.getElementById("status-text");
+  const runBtn = document.getElementById("run-btn");
+  const nextBtn = document.getElementById("next-btn");
+
+  // --- INITIALIZATION ---
+  function loadLevel(index) {
+    if (index >= levels.length) {
+      showVictoryScreen();
+      return;
+    }
+
+    const level = levels[index];
+    currentLevelIndex = index;
+    
+    levelIndicator.innerText = `Level ${level.id} of ${levels.length}`;
+    levelGoal.innerHTML = level.goal;
+    statusText.innerText = "Drag modules to build the flow...";
+    statusText.style.color = "#64748b";
+
+    runBtn.classList.remove("hidden", "success");
+    runBtn.innerHTML = '<i class="fa-solid fa-play"></i> Run Scenario';
+    runBtn.disabled = false;
+    nextBtn.classList.remove("active");
+    nextBtn.style.display = "none";
+
+    canvasArea.innerHTML = "";
+    level.solution.forEach((_, i) => {
+      const slot = document.createElement("div");
+      slot.classList.add("slot");
+      slot.dataset.position = i;
+      canvasArea.appendChild(slot);
+
+      if (i < level.solution.length - 1) {
+        const conn = document.createElement("div");
+        conn.classList.add("connector");
+        canvasArea.appendChild(conn);
+      }
+    });
+
+    poolArea.innerHTML = "";
+    const shuffledModules = [...level.modules].sort(() => Math.random() - 0.5);
+    
+    shuffledModules.forEach(m => {
+      const mod = document.createElement("div");
+      mod.classList.add("module", m.type);
+      mod.draggable = true;
+      mod.dataset.type = m.type;
+      mod.innerHTML = `<i class="${m.icon}"></i> ${m.label}`;
+      poolArea.appendChild(mod);
+    });
+
+    bindDragEvents();
+  }
+
+  // --- DRAG & DROP LOGIC ---
+  function bindDragEvents() {
+    // Note: Touch events are handled by the Polyfill script in <head>
+    
+    document.querySelectorAll(".module").forEach(m => {
+      m.addEventListener("dragstart", () => {
+        dragged = m;
+        m.style.opacity = '0.5';
+      });
+      m.addEventListener("dragend", () => {
+        m.style.opacity = '1';
+      });
+    });
+
+    document.querySelectorAll(".slot").forEach(slot => {
+      slot.addEventListener("dragover", e => {
+        e.preventDefault();
+        slot.classList.add("drag-over");
+      });
+      slot.addEventListener("dragleave", () => {
+        slot.classList.remove("drag-over");
+      });
+      slot.addEventListener("drop", () => {
+        slot.classList.remove("drag-over");
+        if (!slot.firstChild && dragged) {
+          slot.appendChild(dragged);
+          slot.classList.add("filled");
+          statusText.innerText = "Module connected.";
+        }
+      });
+    });
+  }
+
+  // --- GAME LOGIC ---
+  async function runScenario() {
+    if (isRunning) return;
+    
+    const level = levels[currentLevelIndex];
+    const slots = document.querySelectorAll(".slot");
+    const connectors = document.querySelectorAll(".connector");
+
+    let allFilled = true;
+    slots.forEach(s => { if(!s.firstChild) allFilled = false; });
+    
+    if(!allFilled) {
+      statusText.innerText = "❌ Please connect all modules first.";
+      statusText.style.color = "var(--error)";
+      slots.forEach(s => { if(!s.firstChild) s.classList.add("shake"); });
+      setTimeout(() => removeShake(), 500);
+      return;
+    }
+
+    isRunning = true;
+    runBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+    
+    for (let i = 0; i < level.solution.length; i++) {
+      const slot = slots[i];
+      const expected = level.solution[i];
+      
+      statusText.innerText = `Step ${i+1}: Processing ${slot.firstChild.innerText.trim()}...`;
+      slot.firstChild.classList.add("processing");
+      
+      await wait(800); 
+
+      if (slot.firstChild.dataset.type !== expected) {
+        failGame(slot);
+        return;
+      }
+
+      slot.firstChild.classList.remove("processing");
+      
+      if (connectors[i]) {
+        connectors[i].classList.add("active");
+        await wait(600);
+      }
+    }
+
+    succeedGame();
+  }
+
+  function failGame(slot) {
+    slot.classList.add("shake");
+    statusText.innerText = "❌ Incorrect module order. Try again!";
+    statusText.style.color = "var(--error)";
+    slot.firstChild.classList.remove("processing");
+    
+    runBtn.innerHTML = '<i class="fa-solid fa-play"></i> Run Scenario';
+    isRunning = false;
+    setTimeout(() => removeShake(), 500);
+  }
+
+  function succeedGame() {
+    statusText.innerText = "✅ Automation Successful!";
+    statusText.style.color = "var(--success)";
+    
+    runBtn.classList.add("hidden");
+    nextBtn.style.display = "flex";
+    
+    fireConfetti();
+    isRunning = false;
+  }
+
+  function nextLevel() {
+    currentLevelIndex++;
+    loadLevel(currentLevelIndex);
+  }
+
+  function resetLevel() {
+    isRunning = false;
+    const slots = document.querySelectorAll(".slot");
+    
+    slots.forEach(slot => {
+      if (slot.firstChild) {
+        slot.firstChild.classList.remove("processing");
+        poolArea.appendChild(slot.firstChild);
+      }
+      slot.classList.remove("filled", "shake", "drag-over");
+    });
+
+    document.querySelectorAll(".connector").forEach(c => c.classList.remove("active"));
+    statusText.innerText = "Drag modules to build the flow...";
+    statusText.style.color = "#64748b";
+    
+    runBtn.classList.remove("hidden", "success");
+    runBtn.innerHTML = '<i class="fa-solid fa-play"></i> Run Scenario';
+    nextBtn.style.display = "none";
+  }
+
+  function showVictoryScreen() {
+    document.getElementById("game-board").innerHTML = `
+      <div style="padding:30px; text-align:center;">
+        <i class="fa-solid fa-trophy" style="font-size: 50px; color: #fbbf24; margin-bottom:15px;"></i>
+        <h2>Certification Complete!</h2>
+        <p>You have mastered the basics of automation.</p>
+        <button onclick="location.reload()" style="margin: 20px auto; background: var(--primary); color: white;">Play Again</button>
+      </div>
+    `;
+    levelGoal.style.display = 'none';
+    poolArea.style.display = 'none';
+    document.querySelector('.controls').style.display = 'none';
+    fireConfetti();
+  }
+
+  function removeShake() {
+    document.querySelectorAll(".slot").forEach(s => s.classList.remove("shake"));
+  }
+
+  function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  let particles = [];
+  const ctx = document.getElementById("confetti-canvas").getContext("2d");
+  
+  function fireConfetti() {
+    const canvas = document.getElementById("confetti-canvas");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    particles = [];
+    
+    for(let i=0; i<150; i++) {
+      particles.push({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+        vx: (Math.random() - 0.5) * 15,
+        vy: (Math.random() - 0.5) * 15 - 5,
+        color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+        life: 150,
+        gravity: 0.2
+      });
+    }
+    requestAnimationFrame(animateConfetti);
+  }
+
+  function animateConfetti() {
+    if(particles.length === 0) return;
+    const canvas = document.getElementById("confetti-canvas");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    particles.forEach((p, i) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += p.gravity;
+      p.life--;
+      
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, 8, 8);
+      
+      if(p.life <= 0) particles.splice(i, 1);
+    });
+
+    if(particles.length > 0) requestAnimationFrame(animateConfetti);
+  }
+
+  window.addEventListener('resize', () => {
+    document.getElementById("confetti-canvas").width = window.innerWidth;
+    document.getElementById("confetti-canvas").height = window.innerHeight;
+  });
+
+  loadLevel(0);
+
+</script>
+</body>
+</html>
